@@ -71,25 +71,89 @@ def strassen(A, B, cutoff=64):
     return C_pad[:n, :n]
 
 # Example usage
-if __name__ == "__main__":
- # Input the size of the matrices
- n = int(input("Enter the size n of the matrices: "))
+if __name__ == "__main__":   
+ np.set_printoptions(threshold=np.inf)
+ with open("example.txt", "w") as f:
+   
+        sizes = [2**i for i in range(2, 11)]  # 4x4 to 1024x1024
+        T_strassen = []
+        T_numpy = []
+        K=1
+    # Testing for correctness and difference in run time
+        for n in sizes:
+            A = np.random.randint(0, 10, (n, n))
+            B = np.random.randint(0, 10, (n, n))
+            f.write(f"A{(K)} = {A}\n")
+            f.write(f"B{K} = {B}\n")
+            start = time.perf_counter()
+            C = strassen(A, B, cutoff=64)
+            f.write(f"A{K} x B{K} = {C}\n")
+            end = time.perf_counter()
+            T_strassen.append(end - start)
+
+            start1 = time.perf_counter()
+            D = standard_mult(A, B)
+            end1 = time.perf_counter()
+            T_numpy.append(end1 - start1)
+            K=K+1
+
+ with open("runtime_table.txt", "w") as f:
+     # Write header
+     f.write(f"{'Matrix size (n)':>12} {'T_strassen (s)':>15} {'T_numpy (s)':>15}\n")
+     f.write("="*44 + "\n")  
+     for n, t_s, t_n in zip(sizes, T_strassen, T_numpy):
+         f.write(f"{n:12d} {t_s:15.6f} {t_n:15.6f}\n")
+
+        
+        
+
+ alpha_theory = np.log2(7)  # ~2.807
+ c = np.mean(T_strassen / (sizes**alpha_theory))  # scale constant
+ sizes_smooth = np.linspace(sizes[0], sizes[-1], 500)
+ T_theory = c * sizes_smooth**alpha_theory
  
- # Input matrix A
- print("Enter elements of matrix A (row by row):")
- A = np.array([list(map(float, input().split())) for _ in range(n)])
  
- # Validate dimensions
- if A.shape != (n, n):
-     raise ValueError("Matrix A must be of size n x n.")
+ log_sizes = np.log(sizes)
+ log_T = np.log(T_strassen)
+ coeffs = np.polyfit(log_sizes, log_T, 1)  # slope = exponent, intercept = log(c)
+ alpha_empirical, logc_empirical = coeffs
+ T_bestfit = np.exp(logc_empirical) * sizes_smooth**alpha_empirical
  
- # Input matrix B
- print("Enter elements of matrix B (row by row):")
- B = np.array([list(map(float, input().split())) for _ in range(n)])
  
- # Validate dimensions
- if B.shape != (n, n):
-     raise ValueError("Matrix B must be of size n x n.")
- print("\nMatrix A:\n", A)
- print("\nMatrix B:\n", B)
- print("\nMatrix A x B:\n", strassen(A,B))
+ plt.figure(figsize=(8,6))
+ 
+ plt.plot(sizes, T_strassen, 'o-', label="Measured runtime")
+ plt.plot(sizes_smooth, T_theory, '--', label=r"Theoretical $O(n^{\log_2 7})$")
+ plt.plot(sizes_smooth, T_bestfit, '-.', label=rf"Best fit: $O(n^{{{alpha_empirical:.3f}}})$")
+ 
+ plt.xlabel("Matrix size n")
+ plt.ylabel("Runtime (seconds)")
+ plt.title("Strassen Runtime: Measured vs Theoretical & Best Fit")
+ plt.legend()
+ plt.grid(True)
+ plt.show()
+ 
+ # Generate float matrices for numerical accuracy test
+ num_Acc= []
+ for i in range (1,100,1):
+        A = np.random.rand(i,i) * 10
+        B = np.random.rand(i,i) * 10    
+
+        # Compute results
+        stan = standard_mult(A, B)
+        strass = strassen(A, B, cutoff=64)
+
+        # Measure error (sum of squares)
+        error = stan - strass
+    
+        err = np.sum(error**2)
+        num_Acc.append(err) 
+ ind=np.arange(1,100)
+ with open("numerical_accuracy_table.txt", "w") as f:     
+     f.write(f"{'Matrix size (n)':>12} {'Numerical Accuracy':>20}\n")
+     f.write("="*32 + "\n")   
+     for n, acc in zip(ind, num_Acc):
+         f.write(f"{n:12d} {acc:20.6e}\n") 
+        
+        
+
